@@ -1,6 +1,6 @@
 module github.com/kklab-com/goth-kkutil
 
-go 1.13
+go 1.16
 
 require (
 	github.com/biter777/countries v1.3.1
