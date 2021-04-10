@@ -1,16 +1,16 @@
 package buffer
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 )
 
 type ByteBuf interface {
-	io.ByteWriter
 	io.Writer
-	io.ByteReader
 	io.Reader
-	io.StringWriter
+	ReaderIndex() int
+	WriterIndex() int
 	MarkReaderIndex() ByteBuf
 	ResetReaderIndex() ByteBuf
 	MarkWriterIndex() ByteBuf
@@ -19,29 +19,29 @@ type ByteBuf interface {
 	Bytes() []byte
 	ReadableBytes() int
 	Cap() int
-	Grow(i int)
+	Grow(v int)
+	WriteByte(c byte)
 	WriteBytes(bs []byte)
+	WriteString(s string)
 	WriteByteBuf(buf ByteBuf)
-	WriteInt(i int)
-	WriteUInt(i uint)
-	WriteInt64(i int64)
-	WriteUInt64(i uint64)
-	ReadBytes(len int) ([]byte, )
-	ReadByteBuf(len int) (ByteBuf, )
-	ReadInt() (int, )
-	ReadUInt() (uint, )
-	ReadInt64() (int64, )
-	ReadUInt64() (uint64, )
+	WriteInt16(v int16)
+	WriteUInt16(v uint16)
+	WriteInt32(v int32)
+	WriteUInt32(v uint32)
+	WriteInt64(v int64)
+	WriteUInt64(v uint64)
+	ReadByte() byte
+	ReadBytes(len int) []byte
+	ReadByteBuf(len int) ByteBuf
+	ReadInt16() int16
+	ReadUInt16() uint16
+	ReadInt32() int32
+	ReadUInt32() uint32
+	ReadInt64() int64
+	ReadUInt64() uint64
 }
 
 var NilObject = fmt.Errorf("nil object")
-var OutOfRange = fmt.Errorf("out of range")
-var InsufficientSize = fmt.Errorf("insufficient size")
-
-//
-//func NewByteBuf() ByteBuf {
-//	return &*DefaultByteBuf{}
-//}
 
 func NewByteBuf(bs []byte) ByteBuf {
 	buf := &DefaultByteBuf{}
@@ -49,16 +49,13 @@ func NewByteBuf(bs []byte) ByteBuf {
 	return buf
 }
 
+func EmptyByteBuf() ByteBuf {
+	return &DefaultByteBuf{}
+}
+
 type DefaultByteBuf struct {
 	buf                                                        []byte
 	readerIndex, writerIndex, prevReaderIndex, prevWriterIndex int
-}
-
-func (b *DefaultByteBuf) WriteByte(c byte) error {
-	b.prepare(1)
-	b.buf[b.writerIndex] = c
-	b.writerIndex++
-	return nil
 }
 
 func (b *DefaultByteBuf) Write(p []byte) (n int, err error) {
@@ -71,15 +68,6 @@ func (b *DefaultByteBuf) Write(p []byte) (n int, err error) {
 	copy(b.buf[b.writerIndex:], p)
 	b.writerIndex += pl
 	return pl, nil
-}
-
-func (b *DefaultByteBuf) ReadByte() (byte, error) {
-	if b.readerIndex == b.writerIndex {
-		return 0, OutOfRange
-	}
-
-	b.readerIndex++
-	return b.buf[b.readerIndex-1], nil
 }
 
 func (b *DefaultByteBuf) Read(p []byte) (n int, err error) {
@@ -97,8 +85,12 @@ func (b *DefaultByteBuf) Read(p []byte) (n int, err error) {
 	return cpLen, nil
 }
 
-func (b *DefaultByteBuf) WriteString(s string) (n int, err error) {
-	return b.Write([]byte(s))
+func (b *DefaultByteBuf) ReaderIndex() int {
+	return b.readerIndex
+}
+
+func (b *DefaultByteBuf) WriterIndex() int {
+	return b.writerIndex
 }
 
 func (b *DefaultByteBuf) MarkReaderIndex() ByteBuf {
@@ -144,13 +136,21 @@ func (b *DefaultByteBuf) Cap() int {
 	return len(b.buf)
 }
 
-func (b *DefaultByteBuf) Grow(i int) {
-	tb := make([]byte, b.Cap()+i)
+func (b *DefaultByteBuf) Grow(v int) {
+	tb := make([]byte, b.Cap()+v)
 	if b.prevReaderIndex == 0 {
 		copy(tb, b.buf[b.readerIndex:])
 	} else {
 		copy(tb, b.buf[b.prevReaderIndex:])
 	}
+
+	b.buf = tb
+}
+
+func (b *DefaultByteBuf) WriteByte(c byte) {
+	b.prepare(1)
+	b.buf[b.writerIndex] = c
+	b.writerIndex++
 }
 
 func (b *DefaultByteBuf) WriteBytes(bs []byte) {
@@ -168,25 +168,55 @@ func (b *DefaultByteBuf) WriteByteBuf(buf ByteBuf) {
 	b.WriteBytes(buf.Bytes())
 }
 
-func (b *DefaultByteBuf) WriteInt(i int) {
-	panic("implement me")
+func (b *DefaultByteBuf) WriteString(s string) {
+	b.WriteBytes([]byte(s))
 }
 
-func (b *DefaultByteBuf) WriteUInt(i uint) {
-	panic("implement me")
+func (b *DefaultByteBuf) WriteInt16(v int16) {
+	b.WriteUInt16(uint16(v))
 }
 
-func (b *DefaultByteBuf) WriteInt64(i int64) {
-	panic("implement me")
+func (b *DefaultByteBuf) WriteUInt16(v uint16) {
+	bs := make([]byte, 2)
+	binary.BigEndian.PutUint16(bs, v)
+	b.prepare(len(bs))
+	b.WriteBytes(bs)
 }
 
-func (b *DefaultByteBuf) WriteUInt64(i uint64) {
-	panic("implement me")
+func (b *DefaultByteBuf) WriteInt32(v int32) {
+	b.WriteUInt32(uint32(v))
+}
+
+func (b *DefaultByteBuf) WriteUInt32(v uint32) {
+	bs := make([]byte, 4)
+	binary.BigEndian.PutUint32(bs, v)
+	b.prepare(len(bs))
+	b.WriteBytes(bs)
+}
+
+func (b *DefaultByteBuf) WriteInt64(v int64) {
+	b.WriteUInt64(uint64(v))
+}
+
+func (b *DefaultByteBuf) WriteUInt64(v uint64) {
+	bs := make([]byte, 8)
+	binary.BigEndian.PutUint64(bs, v)
+	b.prepare(len(bs))
+	b.WriteBytes(bs)
+}
+
+func (b *DefaultByteBuf) ReadByte() byte {
+	if b.readerIndex == b.writerIndex {
+		panic(io.EOF)
+	}
+
+	b.readerIndex++
+	return b.buf[b.readerIndex-1]
 }
 
 func (b *DefaultByteBuf) ReadBytes(len int) []byte {
 	if b.ReadableBytes() < len {
-		panic(InsufficientSize)
+		panic(io.EOF)
 	}
 
 	b.readerIndex += len
@@ -199,24 +229,36 @@ func (b *DefaultByteBuf) ReadByteBuf(len int) ByteBuf {
 	return buf
 }
 
-func (b *DefaultByteBuf) ReadInt() int {
-	panic("implement me")
+func (b *DefaultByteBuf) ReadInt16() int16 {
+	return int16(b.ReadUInt16())
 }
 
-func (b *DefaultByteBuf) ReadUInt() uint {
-	panic("implement me")
+func (b *DefaultByteBuf) ReadUInt16() uint16 {
+	return binary.BigEndian.Uint16(b.ReadBytes(2))
+}
+
+func (b *DefaultByteBuf) ReadInt32() int32 {
+	return int32(b.ReadUInt32())
+}
+
+func (b *DefaultByteBuf) ReadUInt32() uint32 {
+	return binary.BigEndian.Uint32(b.ReadBytes(4))
 }
 
 func (b *DefaultByteBuf) ReadInt64() int64 {
-	panic("implement me")
+	return int64(b.ReadUInt64())
 }
 
 func (b *DefaultByteBuf) ReadUInt64() uint64 {
-	panic("implement me")
+	return binary.BigEndian.Uint64(b.ReadBytes(8))
 }
 
 func (b *DefaultByteBuf) prepare(i int) {
-	if b.writerIndex+i < b.Cap() {
+	if b.Cap() == 0 {
+		b.Grow(32)
+	}
+
+	if b.writerIndex+i > b.Cap() {
 		b.Grow(b.Cap() * 2)
 	}
 }
