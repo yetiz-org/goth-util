@@ -1,4 +1,4 @@
-package buffer
+package buf
 
 import (
 	"encoding/binary"
