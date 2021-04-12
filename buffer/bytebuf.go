@@ -139,7 +139,10 @@ func (b *DefaultByteBuf) Cap() int {
 func (b *DefaultByteBuf) Grow(v int) {
 	tb := make([]byte, b.Cap()+v)
 	if b.prevReaderIndex == 0 {
+		offset := b.readerIndex - b.prevReaderIndex
 		copy(tb, b.buf[b.readerIndex:])
+		b.writerIndex -= offset
+		b.prevWriterIndex -= offset
 	} else {
 		copy(tb, b.buf[b.prevReaderIndex:])
 	}
