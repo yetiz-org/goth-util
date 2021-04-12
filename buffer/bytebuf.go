@@ -41,7 +41,8 @@ type ByteBuf interface {
 	ReadUInt64() uint64
 }
 
-var NilObject = fmt.Errorf("nil object")
+var ErrNilObject = fmt.Errorf("nil object")
+var ErrInsufficientSize = fmt.Errorf("insufficient size")
 
 func NewByteBuf(bs []byte) ByteBuf {
 	buf := &DefaultByteBuf{}
@@ -175,7 +176,7 @@ func (b *DefaultByteBuf) WriteBytes(bs []byte) {
 
 func (b *DefaultByteBuf) WriteByteBuf(buf ByteBuf) {
 	if buf == nil {
-		panic(NilObject)
+		panic(ErrNilObject)
 	}
 
 	b.WriteBytes(buf.Bytes())
@@ -220,7 +221,7 @@ func (b *DefaultByteBuf) WriteUInt64(v uint64) {
 
 func (b *DefaultByteBuf) ReadByte() byte {
 	if b.readerIndex == b.writerIndex {
-		panic(io.EOF)
+		panic(ErrInsufficientSize)
 	}
 
 	b.readerIndex++
@@ -229,7 +230,7 @@ func (b *DefaultByteBuf) ReadByte() byte {
 
 func (b *DefaultByteBuf) ReadBytes(len int) []byte {
 	if b.ReadableBytes() < len {
-		panic(io.EOF)
+		panic(ErrInsufficientSize)
 	}
 
 	b.readerIndex += len
