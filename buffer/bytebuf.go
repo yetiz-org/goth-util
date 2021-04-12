@@ -145,6 +145,11 @@ func (b *DefaultByteBuf) Grow(v int) {
 		b.prevWriterIndex -= offset
 	} else {
 		copy(tb, b.buf[b.prevReaderIndex:])
+		offset := b.prevReaderIndex
+		b.prevReaderIndex = 0
+		b.readerIndex -= offset
+		b.writerIndex -= offset
+		b.prevWriterIndex -= offset
 	}
 
 	b.buf = tb
