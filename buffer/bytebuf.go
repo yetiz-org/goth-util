@@ -141,15 +141,20 @@ func (b *DefaultByteBuf) Grow(v int) {
 	if b.prevReaderIndex == 0 {
 		offset := b.readerIndex - b.prevReaderIndex
 		copy(tb, b.buf[b.readerIndex:])
+		b.readerIndex -= offset
 		b.writerIndex -= offset
-		b.prevWriterIndex -= offset
+		if b.prevWriterIndex > 0 {
+			b.prevWriterIndex -= offset
+		}
 	} else {
 		copy(tb, b.buf[b.prevReaderIndex:])
 		offset := b.prevReaderIndex
 		b.prevReaderIndex = 0
 		b.readerIndex -= offset
 		b.writerIndex -= offset
-		b.prevWriterIndex -= offset
+		if b.prevWriterIndex > 0 {
+			b.prevWriterIndex -= offset
+		}
 	}
 
 	b.buf = tb
@@ -266,7 +271,7 @@ func (b *DefaultByteBuf) prepare(i int) {
 		b.Grow(32)
 	}
 
-	if b.writerIndex+i > b.Cap() {
-		b.Grow(b.Cap() * 2)
+	for ; b.writerIndex+i > b.Cap(); {
+		b.Grow(b.Cap())
 	}
 }

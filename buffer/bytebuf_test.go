@@ -74,3 +74,20 @@ func TestDefaultByteBuf_Mark(t *testing.T) {
 	buf.WriteString("ok")
 	assert.EqualValues(t, "ok", string(buf.ReadBytes(buf.ReadableBytes())))
 }
+
+func TestDefaultByteBuf_Grow(t *testing.T) {
+	buf := EmptyByteBuf()
+	buf.WriteByte(0x01)
+	assert.EqualValues(t, 32, buf.Cap())
+	assert.EqualValues(t, 1, buf.ReadableBytes())
+	buf.ReadBytes(1)
+	assert.EqualValues(t, 32, buf.Cap())
+	assert.EqualValues(t, 0, buf.ReadableBytes())
+	buf.WriteString("abcdef")
+	buf.ReadBytes(5)
+	assert.EqualValues(t, 32, buf.Cap())
+	assert.EqualValues(t, 1, buf.ReadableBytes())
+	buf.WriteString("abcdeabcdeabcdeabcdeabcdeabcde")
+	assert.EqualValues(t, 64, buf.Cap())
+	assert.EqualValues(t, 31, buf.ReadableBytes())
+}
