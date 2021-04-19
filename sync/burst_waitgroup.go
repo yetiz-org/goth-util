@@ -33,6 +33,10 @@ func (w *BurstWaitGroup) Wait() {
 	w.wg.Wait()
 }
 
+func (w *BurstWaitGroup) Remain() int {
+	return w.delta
+}
+
 func (w *BurstWaitGroup) Burst() {
 	w.Add(w.delta * -1)
 
