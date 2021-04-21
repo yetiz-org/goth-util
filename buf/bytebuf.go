@@ -24,6 +24,7 @@ type ByteBuf interface {
 	WriteBytes(bs []byte)
 	WriteString(s string)
 	WriteByteBuf(buf ByteBuf)
+	WriteReader(reader io.Reader)
 	WriteInt16(v int16)
 	WriteUInt16(v uint16)
 	WriteInt32(v int32)
@@ -180,6 +181,18 @@ func (b *DefaultByteBuf) WriteByteBuf(buf ByteBuf) {
 	}
 
 	b.WriteBytes(buf.Bytes())
+}
+
+func (b *DefaultByteBuf) WriteReader(reader io.Reader) {
+	if reader == nil {
+		panic(ErrNilObject)
+	}
+
+	if bs, err := io.ReadAll(reader); err != nil {
+		panic(err)
+	} else {
+		b.WriteBytes(bs)
+	}
 }
 
 func (b *DefaultByteBuf) WriteString(s string) {
