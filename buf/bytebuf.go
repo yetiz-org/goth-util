@@ -19,18 +19,18 @@ type ByteBuf interface {
 	Bytes() []byte
 	ReadableBytes() int
 	Cap() int
-	Grow(v int)
-	WriteByte(c byte)
-	WriteBytes(bs []byte)
-	WriteString(s string)
-	WriteByteBuf(buf ByteBuf)
-	WriteReader(reader io.Reader)
-	WriteInt16(v int16)
-	WriteUInt16(v uint16)
-	WriteInt32(v int32)
-	WriteUInt32(v uint32)
-	WriteInt64(v int64)
-	WriteUInt64(v uint64)
+	Grow(v int) ByteBuf
+	WriteByte(c byte) ByteBuf
+	WriteBytes(bs []byte) ByteBuf
+	WriteString(s string) ByteBuf
+	WriteByteBuf(buf ByteBuf) ByteBuf
+	WriteReader(reader io.Reader) ByteBuf
+	WriteInt16(v int16) ByteBuf
+	WriteUInt16(v uint16) ByteBuf
+	WriteInt32(v int32) ByteBuf
+	WriteUInt32(v uint32) ByteBuf
+	WriteInt64(v int64) ByteBuf
+	WriteUInt64(v uint64) ByteBuf
 	ReadByte() byte
 	ReadBytes(len int) []byte
 	ReadByteBuf(len int) ByteBuf
@@ -138,7 +138,7 @@ func (b *DefaultByteBuf) Cap() int {
 	return len(b.buf)
 }
 
-func (b *DefaultByteBuf) Grow(v int) {
+func (b *DefaultByteBuf) Grow(v int) ByteBuf {
 	tb := make([]byte, b.Cap()+v)
 	if b.prevReaderIndex == 0 {
 		offset := b.readerIndex - b.prevReaderIndex
@@ -160,30 +160,34 @@ func (b *DefaultByteBuf) Grow(v int) {
 	}
 
 	b.buf = tb
+	return b
 }
 
-func (b *DefaultByteBuf) WriteByte(c byte) {
+func (b *DefaultByteBuf) WriteByte(c byte) ByteBuf {
 	b.prepare(1)
 	b.buf[b.writerIndex] = c
 	b.writerIndex++
+	return b
 }
 
-func (b *DefaultByteBuf) WriteBytes(bs []byte) {
+func (b *DefaultByteBuf) WriteBytes(bs []byte) ByteBuf {
 	pl := len(bs)
 	b.prepare(pl)
 	copy(b.buf[b.writerIndex:], bs)
 	b.writerIndex += pl
+	return b
 }
 
-func (b *DefaultByteBuf) WriteByteBuf(buf ByteBuf) {
+func (b *DefaultByteBuf) WriteByteBuf(buf ByteBuf) ByteBuf {
 	if buf == nil {
 		panic(ErrNilObject)
 	}
 
 	b.WriteBytes(buf.Bytes())
+	return b
 }
 
-func (b *DefaultByteBuf) WriteReader(reader io.Reader) {
+func (b *DefaultByteBuf) WriteReader(reader io.Reader) ByteBuf {
 	if reader == nil {
 		panic(ErrNilObject)
 	}
@@ -193,43 +197,52 @@ func (b *DefaultByteBuf) WriteReader(reader io.Reader) {
 	} else {
 		b.WriteBytes(bs)
 	}
+
+	return b
 }
 
-func (b *DefaultByteBuf) WriteString(s string) {
+func (b *DefaultByteBuf) WriteString(s string) ByteBuf {
 	b.WriteBytes([]byte(s))
+	return b
 }
 
-func (b *DefaultByteBuf) WriteInt16(v int16) {
+func (b *DefaultByteBuf) WriteInt16(v int16) ByteBuf {
 	b.WriteUInt16(uint16(v))
+	return b
 }
 
-func (b *DefaultByteBuf) WriteUInt16(v uint16) {
+func (b *DefaultByteBuf) WriteUInt16(v uint16) ByteBuf {
 	bs := make([]byte, 2)
 	binary.BigEndian.PutUint16(bs, v)
 	b.prepare(len(bs))
 	b.WriteBytes(bs)
+	return b
 }
 
-func (b *DefaultByteBuf) WriteInt32(v int32) {
+func (b *DefaultByteBuf) WriteInt32(v int32) ByteBuf {
 	b.WriteUInt32(uint32(v))
+	return b
 }
 
-func (b *DefaultByteBuf) WriteUInt32(v uint32) {
+func (b *DefaultByteBuf) WriteUInt32(v uint32) ByteBuf {
 	bs := make([]byte, 4)
 	binary.BigEndian.PutUint32(bs, v)
 	b.prepare(len(bs))
 	b.WriteBytes(bs)
+	return b
 }
 
-func (b *DefaultByteBuf) WriteInt64(v int64) {
+func (b *DefaultByteBuf) WriteInt64(v int64) ByteBuf {
 	b.WriteUInt64(uint64(v))
+	return b
 }
 
-func (b *DefaultByteBuf) WriteUInt64(v uint64) {
+func (b *DefaultByteBuf) WriteUInt64(v uint64) ByteBuf {
 	bs := make([]byte, 8)
 	binary.BigEndian.PutUint64(bs, v)
 	b.prepare(len(bs))
 	b.WriteBytes(bs)
+	return b
 }
 
 func (b *DefaultByteBuf) ReadByte() byte {
