@@ -10,6 +10,10 @@ type Queue struct {
 }
 
 func (q *Queue) Push(obj interface{}) *Queue {
+	if obj == nil {
+		return q
+	}
+
 	q.op.Lock()
 	defer q.op.Unlock()
 	if q.head == nil {

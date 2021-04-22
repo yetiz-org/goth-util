@@ -19,4 +19,5 @@ func TestQueue(t *testing.T) {
 	assert.EqualValues(t, q.Pop(), 1)
 	q.Reset()
 	assert.EqualValues(t, 0, q.Len())
+	assert.Nil(t, q.Pop())
 }
