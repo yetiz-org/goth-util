@@ -20,6 +20,7 @@ type ByteBuf interface {
 	ReadableBytes() int
 	Cap() int
 	Grow(v int) ByteBuf
+	Skip(v int) ByteBuf
 	WriteByte(c byte) ByteBuf
 	WriteBytes(bs []byte) ByteBuf
 	WriteString(s string) ByteBuf
@@ -34,6 +35,7 @@ type ByteBuf interface {
 	ReadByte() byte
 	ReadBytes(len int) []byte
 	ReadByteBuf(len int) ByteBuf
+	ReadWriter(writer io.Writer) ByteBuf
 	ReadInt16() int16
 	ReadUInt16() uint16
 	ReadInt32() int32
@@ -163,6 +165,11 @@ func (b *DefaultByteBuf) Grow(v int) ByteBuf {
 	return b
 }
 
+func (b *DefaultByteBuf) Skip(v int) ByteBuf {
+	b.ReadBytes(v)
+	return b
+}
+
 func (b *DefaultByteBuf) WriteByte(c byte) ByteBuf {
 	b.prepare(1)
 	b.buf[b.writerIndex] = c
@@ -255,6 +262,10 @@ func (b *DefaultByteBuf) ReadByte() byte {
 }
 
 func (b *DefaultByteBuf) ReadBytes(len int) []byte {
+	if len <= 0 {
+		return []byte{}
+	}
+
 	if b.ReadableBytes() < len {
 		panic(ErrInsufficientSize)
 	}
@@ -267,6 +278,17 @@ func (b *DefaultByteBuf) ReadByteBuf(len int) ByteBuf {
 	buf := &DefaultByteBuf{}
 	buf.WriteBytes(b.ReadBytes(len))
 	return buf
+}
+
+func (b *DefaultByteBuf) ReadWriter(writer io.Writer) ByteBuf {
+	bs := b.Bytes()
+	n, err := writer.Write(bs)
+	b.ReadBytes(n)
+	if err != nil {
+		panic(ErrInsufficientSize)
+	}
+
+	return b
 }
 
 func (b *DefaultByteBuf) ReadInt16() int16 {
