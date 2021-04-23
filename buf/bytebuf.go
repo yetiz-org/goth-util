@@ -53,6 +53,12 @@ func NewByteBuf(bs []byte) ByteBuf {
 	return buf
 }
 
+func NewByteBufString(str string) ByteBuf {
+	buf := &DefaultByteBuf{}
+	buf.WriteString(str)
+	return buf
+}
+
 func EmptyByteBuf() ByteBuf {
 	return &DefaultByteBuf{}
 }
