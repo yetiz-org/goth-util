@@ -9,6 +9,7 @@ import (
 type ByteBuf interface {
 	io.Writer
 	io.Reader
+	io.Closer
 	ReaderIndex() int
 	WriterIndex() int
 	MarkReaderIndex() ByteBuf
@@ -93,6 +94,11 @@ func (b *DefaultByteBuf) Read(p []byte) (n int, err error) {
 	copy(p, b.buf[b.readerIndex:b.readerIndex+cpLen])
 	b.readerIndex += cpLen
 	return cpLen, nil
+}
+
+func (b *DefaultByteBuf) Close() error {
+	b.Reset()
+	return nil
 }
 
 func (b *DefaultByteBuf) ReaderIndex() int {
