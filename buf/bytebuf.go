@@ -22,6 +22,7 @@ type ByteBuf interface {
 	Cap() int
 	Grow(v int) ByteBuf
 	Skip(v int) ByteBuf
+	Clone() ByteBuf
 	WriteByte(c byte) ByteBuf
 	WriteBytes(bs []byte) ByteBuf
 	WriteString(s string) ByteBuf
@@ -180,6 +181,10 @@ func (b *DefaultByteBuf) Grow(v int) ByteBuf {
 func (b *DefaultByteBuf) Skip(v int) ByteBuf {
 	b.ReadBytes(v)
 	return b
+}
+
+func (b *DefaultByteBuf) Clone() ByteBuf {
+	return NewByteBuf(b.Bytes())
 }
 
 func (b *DefaultByteBuf) WriteByte(c byte) ByteBuf {
