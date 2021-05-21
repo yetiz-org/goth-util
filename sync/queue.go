@@ -2,6 +2,10 @@ package sync
 
 import "sync"
 
+var queuePool = &sync.Pool{
+	New: func() interface{} { return &queueElement{} },
+}
+
 type Queue struct {
 	head *queueElement
 	tail *queueElement
@@ -17,22 +21,19 @@ func (q *Queue) Push(obj interface{}) *Queue {
 	q.op.Lock()
 	defer q.op.Unlock()
 	if q.head == nil {
-		q.head = &queueElement{
-			prev: nil,
-			next: nil,
-			obj:  obj,
-		}
-
+		qe := queuePool.Get().(*queueElement)
+		qe.prev = nil
+		qe.next = nil
+		qe.obj = obj
+		q.head = qe
 		q.tail = q.head
 	} else {
-		ne := &queueElement{
-			prev: q.tail,
-			next: nil,
-			obj:  obj,
-		}
-
-		q.tail.next = ne
-		q.tail = ne
+		qe := queuePool.Get().(*queueElement)
+		qe.prev = q.tail
+		qe.next = nil
+		qe.obj = obj
+		q.tail.next = qe
+		q.tail = qe
 	}
 
 	q.len++
@@ -54,9 +55,13 @@ func (q *Queue) Pop() interface{} {
 		q.head.prev = nil
 	}
 
+	obj := rtn.obj
+	rtn.prev = nil
 	rtn.next = nil
+	rtn.obj = nil
+	queuePool.Put(rtn)
 	q.len--
-	return rtn.obj
+	return obj
 }
 
 func (q *Queue) Reset() *Queue {
