@@ -49,14 +49,12 @@ func NewFuture(ctx context.Context) Future {
 	}
 
 	f.ctx, f.cancel = context.WithCancel(ctx)
-	f.init()
 	return f
 }
 
 func NewSucceededFuture(obj interface{}) Future {
 	f := &DefaultFuture{}
 	f.ctx, f.cancel = context.WithCancel(context.Background())
-	f.init()
 	f.Complete(obj)
 	return f
 }
@@ -64,7 +62,6 @@ func NewSucceededFuture(obj interface{}) Future {
 func NewCancelledFuture() Future {
 	f := &DefaultFuture{}
 	f.ctx, f.cancel = context.WithCancel(context.Background())
-	f.init()
 	f.Cancel()
 	return f
 }
@@ -72,7 +69,6 @@ func NewCancelledFuture() Future {
 func NewFailedFuture(err error) Future {
 	f := &DefaultFuture{}
 	f.ctx, f.cancel = context.WithCancel(context.Background())
-	f.init()
 	f.Fail(err)
 	return f
 }
@@ -86,18 +82,6 @@ type DefaultFuture struct {
 	opL       sync.Mutex
 	listeners []FutureListener
 	once      sync.Once
-}
-
-func (f *DefaultFuture) init() {
-	f.opL.Lock()
-	go func() {
-		f.opL.Unlock()
-		<-f.ctx.Done()
-		f._cancelJudge()
-	}()
-
-	f.opL.Lock()
-	f.opL.Unlock()
 }
 
 func (f *DefaultFuture) _cancelJudge() {

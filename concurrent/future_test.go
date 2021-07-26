@@ -115,7 +115,7 @@ func TestFuture(t *testing.T) {
 	assert.EqualValues(t, false, f.IsSuccess())
 	assert.EqualValues(t, false, f.IsCancelled())
 	assert.EqualValues(t, false, f.IsError())
-	time.Sleep(time.Millisecond)
+	f.Get()
 	assert.EqualValues(t, true, f.IsDone())
 	assert.EqualValues(t, true, f.IsCancelled())
 
