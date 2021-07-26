@@ -44,7 +44,7 @@ func TestFuture(t *testing.T) {
 		}
 	}))
 
-	f.Sync()
+	f.Await()
 
 	f = NewFuture(nil)
 	go func() {
@@ -58,7 +58,7 @@ func TestFuture(t *testing.T) {
 		}
 	}))
 
-	f.Sync()
+	f.Await()
 
 	f = NewFuture(nil)
 	go func() {
@@ -73,7 +73,7 @@ func TestFuture(t *testing.T) {
 	}))
 
 	assert.EqualValues(t, false, f.IsDone())
-	f.Sync()
+	f.Await()
 	assert.EqualValues(t, "fail", f.Error().Error())
 
 	f = NewSucceededFuture("s")

@@ -16,7 +16,6 @@ const (
 
 type Future interface {
 	Get() interface{}
-	Sync() Future
 	Await() Future
 	IsDone() bool
 	IsSuccess() bool
@@ -108,13 +107,9 @@ func (f *DefaultFuture) Get() interface{} {
 	return f.obj
 }
 
-func (f *DefaultFuture) Sync() Future {
+func (f *DefaultFuture) Await() Future {
 	f.Get()
 	return f
-}
-
-func (f *DefaultFuture) Await() Future {
-	return f.Sync()
 }
 
 func (f *DefaultFuture) IsDone() bool {
