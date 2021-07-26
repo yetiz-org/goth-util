@@ -40,12 +40,14 @@ func NewFuture(ctx context.Context) Future {
 	}
 
 	f.ctx, f.cancel = context.WithCancel(ctx)
+	f.init()
 	return f
 }
 
-func NewSuccessedFuture(obj interface{}) Future {
+func NewSucceededFuture(obj interface{}) Future {
 	f := &DefaultFuture{}
 	f.ctx, f.cancel = context.WithCancel(context.Background())
+	f.init()
 	f.Complete(obj)
 	return f
 }
@@ -53,14 +55,16 @@ func NewSuccessedFuture(obj interface{}) Future {
 func NewCancelledFuture() Future {
 	f := &DefaultFuture{}
 	f.ctx, f.cancel = context.WithCancel(context.Background())
+	f.init()
 	f.Cancel()
 	return f
 }
 
-func NewFailedFuture() Future {
+func NewFailedFuture(err error) Future {
 	f := &DefaultFuture{}
 	f.ctx, f.cancel = context.WithCancel(context.Background())
-	f.Fail(fmt.Errorf("empty future"))
+	f.init()
+	f.Fail(err)
 	return f
 }
 
@@ -75,18 +79,32 @@ type DefaultFuture struct {
 	once      sync.Once
 }
 
+func (f *DefaultFuture) init() {
+	f.opL.Lock()
+	go func() {
+		f.opL.Unlock()
+		<-f.ctx.Done()
+		f._cancelJudge()
+	}()
+
+	f.opL.Lock()
+	f.opL.Unlock()
+}
+
+func (f *DefaultFuture) _cancelJudge() {
+	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateCancel) {
+		f.err = f.ctx.Err()
+		f.callListener()
+	}
+}
+
 func (f *DefaultFuture) Get() interface{} {
 	if f.IsDone() {
 		return f.obj
 	}
 
 	<-f.ctx.Done()
-	if !f.IsDone() {
-		atomic.StoreInt32(&f.state, stateCancel)
-		f.err = f.ctx.Err()
-		f.callListener()
-	}
-
+	f._cancelJudge()
 	return f.obj
 }
 
@@ -170,16 +188,38 @@ type FutureListener interface {
 }
 
 type _FutureListener struct {
-	DefaultFuture
+	Future
 	f func(f Future)
 }
 
 func (l *_FutureListener) OperationCompleted(f Future) {
-	l.f(f)
+	func(f Future) {
+		defer func() {
+			if v := recover(); v != nil {
+				switch cast := v.(type) {
+				case error:
+					l.Future.(CompletableFuture).Fail(cast)
+				default:
+					l.Future.(CompletableFuture).Fail(fmt.Errorf("%v", cast))
+				}
+			}
+		}()
+
+		l.f(f)
+		l.Future.(CompletableFuture).Complete(f.Get())
+	}(f)
+}
+
+func (l *_FutureListener) AddListener(listener FutureListener) Future {
+	l.Future.(*DefaultFuture).opL.Lock()
+	defer l.Future.(*DefaultFuture).opL.Unlock()
+	l.Future.(*DefaultFuture).listeners = append(l.Future.(*DefaultFuture).listeners, listener)
+	return l
 }
 
 func NewFutureListener(f func(f Future)) FutureListener {
 	return &_FutureListener{
-		f: f,
+		Future: NewFuture(nil),
+		f:      f,
 	}
 }
