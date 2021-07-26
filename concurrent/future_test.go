@@ -138,5 +138,6 @@ func TestFuture(t *testing.T) {
 	assert.EqualValues(t, 2, ffv)
 
 	f = NewCarrierFuture(1)
+	f.(CompletableFuture).Complete(nil)
 	assert.EqualValues(t, 1, f.(CarrierFuture).Payload())
 }
