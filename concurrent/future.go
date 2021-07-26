@@ -32,6 +32,16 @@ type CompletableFuture interface {
 	callListener()
 }
 
+type CarrierFuture interface {
+	Payload() interface{}
+}
+
+func NewCarrierFuture(obj interface{}) Future {
+	f := NewFuture(nil)
+	f.(*DefaultFuture).obj = obj
+	return f
+}
+
 func NewFuture(ctx context.Context) Future {
 	f := &DefaultFuture{}
 	if ctx == nil {
@@ -175,6 +185,10 @@ func (f *DefaultFuture) callListener() {
 			listener.OperationCompleted(f)
 		}
 	})
+}
+
+func (f *DefaultFuture) Payload() interface{} {
+	return f.obj
 }
 
 type FutureListener interface {
