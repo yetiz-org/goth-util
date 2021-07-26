@@ -154,7 +154,10 @@ func (f *DefaultFuture) Complete(obj interface{}) {
 	defer f.opL.Unlock()
 	if !f.IsDone() {
 		atomic.StoreInt32(&f.state, stateSuccess)
-		f.obj = obj
+		if obj != nil {
+			f.obj = obj
+		}
+
 		f.callListener()
 		f.cancel()
 	}
