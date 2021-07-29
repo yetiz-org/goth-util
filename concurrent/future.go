@@ -22,6 +22,7 @@ type Future interface {
 	IsCancelled() bool
 	IsError() bool
 	Error() error
+	Ctx() context.Context
 	AddListener(listener FutureListener) Future
 }
 
@@ -43,33 +44,34 @@ func NewCarrierFuture(obj interface{}) Future {
 }
 
 func NewFuture(ctx context.Context) Future {
-	f := &DefaultFuture{}
+	var f = &DefaultFuture{}
 	if ctx == nil {
-		ctx = context.Background()
+		f.ctx, f.cancel = context.WithCancel(context.Background())
+	} else {
+		f.ctx, f.cancel = context.WithCancel(ctx)
+		go func(f *DefaultFuture) {
+			f._waitCancelJudge()
+		}(f)
 	}
 
-	f.ctx, f.cancel = context.WithCancel(ctx)
 	return f
 }
 
 func NewSucceededFuture(obj interface{}) Future {
-	f := &DefaultFuture{}
-	f.ctx, f.cancel = context.WithCancel(context.Background())
-	f.Complete(obj)
+	f := NewFuture(nil)
+	f.(CompletableFuture).Complete(obj)
 	return f
 }
 
 func NewCancelledFuture() Future {
-	f := &DefaultFuture{}
-	f.ctx, f.cancel = context.WithCancel(context.Background())
-	f.Cancel()
+	f := NewFuture(nil)
+	f.(CompletableFuture).Cancel()
 	return f
 }
 
 func NewFailedFuture(err error) Future {
-	f := &DefaultFuture{}
-	f.ctx, f.cancel = context.WithCancel(context.Background())
-	f.Fail(err)
+	f := NewFuture(nil)
+	f.(CompletableFuture).Fail(err)
 	return f
 }
 
@@ -84,7 +86,8 @@ type DefaultFuture struct {
 	once      sync.Once
 }
 
-func (f *DefaultFuture) _cancelJudge() {
+func (f *DefaultFuture) _waitCancelJudge() {
+	<-f.ctx.Done()
 	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateCancel) {
 		f.err = f.ctx.Err()
 		f.callListener()
@@ -96,8 +99,7 @@ func (f *DefaultFuture) Get() interface{} {
 		return f.obj
 	}
 
-	<-f.ctx.Done()
-	f._cancelJudge()
+	f._waitCancelJudge()
 	return f.obj
 }
 
@@ -126,6 +128,10 @@ func (f *DefaultFuture) Error() error {
 	return f.err
 }
 
+func (f *DefaultFuture) Ctx() context.Context {
+	return f.ctx
+}
+
 func (f *DefaultFuture) AddListener(listener FutureListener) Future {
 	f.opL.Lock()
 	defer f.opL.Unlock()
@@ -134,10 +140,7 @@ func (f *DefaultFuture) AddListener(listener FutureListener) Future {
 }
 
 func (f *DefaultFuture) Complete(obj interface{}) {
-	f.opL.Lock()
-	defer f.opL.Unlock()
-	if !f.IsDone() {
-		atomic.StoreInt32(&f.state, stateSuccess)
+	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateSuccess) {
 		if obj != nil {
 			f.obj = obj
 		}
@@ -148,18 +151,14 @@ func (f *DefaultFuture) Complete(obj interface{}) {
 }
 
 func (f *DefaultFuture) Cancel() {
-	f.opL.Lock()
-	defer f.opL.Unlock()
-	if !f.IsDone() {
+	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateCancel) {
+		f.callListener()
 		f.cancel()
 	}
 }
 
 func (f *DefaultFuture) Fail(err error) {
-	f.opL.Lock()
-	defer f.opL.Unlock()
-	if !f.IsDone() {
-		atomic.StoreInt32(&f.state, stateFail)
+	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateFail) {
 		f.err = err
 		f.callListener()
 		f.cancel()

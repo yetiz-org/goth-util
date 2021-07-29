@@ -89,7 +89,7 @@ func TestFuture(t *testing.T) {
 	assert.EqualValues(t, nil, f.Get())
 	assert.EqualValues(t, true, f.IsDone())
 	assert.EqualValues(t, true, f.IsCancelled())
-	assert.EqualValues(t, false, f.Error() == nil)
+	assert.EqualValues(t, true, f.Error() == nil)
 	f.AddListener(NewFutureListener(func(f Future) {
 		assert.Fail(t, "should not go into this scope")
 	}))
@@ -108,16 +108,11 @@ func TestFuture(t *testing.T) {
 	f.AddListener(NewFutureListener(func(f Future) {
 		assert.EqualValues(t, true, f.IsDone())
 		assert.EqualValues(t, true, f.IsCancelled())
+		assert.EqualValues(t, true, f.Error() != nil)
 	}))
 
 	cancelFunc()
-	assert.EqualValues(t, false, f.IsDone())
-	assert.EqualValues(t, false, f.IsSuccess())
-	assert.EqualValues(t, false, f.IsCancelled())
-	assert.EqualValues(t, false, f.IsError())
-	f.Get()
-	assert.EqualValues(t, true, f.IsDone())
-	assert.EqualValues(t, true, f.IsCancelled())
+	time.Sleep(time.Millisecond)
 
 	ffv := int32(0)
 	f = NewFuture(nil)
