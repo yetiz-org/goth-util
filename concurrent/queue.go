@@ -13,9 +13,9 @@ type Queue struct {
 	op   sync.Mutex
 }
 
-func (q *Queue) Push(obj interface{}) *Queue {
+func (q *Queue) Push(obj interface{}) {
 	if obj == nil {
-		return q
+		return
 	}
 
 	q.op.Lock()
@@ -37,7 +37,6 @@ func (q *Queue) Push(obj interface{}) *Queue {
 	}
 
 	q.len++
-	return q
 }
 
 func (q *Queue) Pop() interface{} {
@@ -87,9 +86,9 @@ type BlockingQueue struct {
 	bwg BurstWaitGroup
 }
 
-func (q *BlockingQueue) Push(obj interface{}) *BlockingQueue {
+func (q *BlockingQueue) Push(obj interface{}) {
 	if obj == nil {
-		return q
+		return
 	}
 
 	q.op.Lock()
@@ -114,8 +113,6 @@ func (q *BlockingQueue) Push(obj interface{}) *BlockingQueue {
 	if q.bwg.Remain() > 0 {
 		q.bwg.Burst()
 	}
-
-	return q
 }
 
 func (q *BlockingQueue) Pop() interface{} {
