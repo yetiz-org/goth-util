@@ -24,6 +24,7 @@ type Future interface {
 	Error() error
 	Ctx() context.Context
 	AddListener(listener FutureListener) Future
+	Completable() CompletableFuture
 }
 
 type CompletableFuture interface {
@@ -137,6 +138,14 @@ func (f *DefaultFuture) AddListener(listener FutureListener) Future {
 	defer f.opL.Unlock()
 	f.listeners = append(f.listeners, listener)
 	return f
+}
+
+func (f *DefaultFuture) self() Future {
+	return f
+}
+
+func (f *DefaultFuture) Completable() CompletableFuture {
+	return f.self().(CompletableFuture)
 }
 
 func (f *DefaultFuture) Complete(obj interface{}) {
