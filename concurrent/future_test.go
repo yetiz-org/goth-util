@@ -135,4 +135,14 @@ func TestFuture(t *testing.T) {
 	f = NewCarrierFuture(1)
 	f.(CompletableFuture).Complete(nil)
 	assert.EqualValues(t, 1, f.(CarrierFuture).Payload())
+
+	f = NewFuture(nil)
+	st := time.Now()
+	go func() {
+		<-time.After(time.Second / 2)
+		f.Completable().Complete("")
+	}()
+
+	<-f.Done()
+	assert.True(t, st.Add(time.Second/2).Before(time.Now()))
 }

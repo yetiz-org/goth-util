@@ -16,6 +16,7 @@ const (
 
 type Future interface {
 	Get() interface{}
+	Done() <-chan struct{}
 	Await() Future
 	IsDone() bool
 	IsSuccess() bool
@@ -102,6 +103,10 @@ func (f *DefaultFuture) Get() interface{} {
 
 	f._waitCancelJudge()
 	return f.obj
+}
+
+func (f *DefaultFuture) Done() <-chan struct{} {
+	return f.ctx.Done()
 }
 
 func (f *DefaultFuture) Await() Future {
