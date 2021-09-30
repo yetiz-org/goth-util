@@ -233,8 +233,9 @@ func (l *_FutureListener) AddListener(listener FutureListener) Future {
 }
 
 func NewFutureListener(f func(f Future)) FutureListener {
+	lf := f
 	return &_FutureListener{
 		Future: NewFuture(nil),
-		f:      f,
+		f:      lf,
 	}
 }
