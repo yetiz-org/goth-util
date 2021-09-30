@@ -202,6 +202,12 @@ type _FutureListener struct {
 }
 
 func (l *_FutureListener) OperationCompleted(f Future) {
+	if l.f == nil {
+		println("nil f in future listener")
+		l.Future.(CompletableFuture).Fail(fmt.Errorf("nil f in future listener"))
+		return
+	}
+
 	func(f Future) {
 		defer func() {
 			if v := recover(); v != nil {
