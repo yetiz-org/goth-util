@@ -3,6 +3,8 @@ package concurrent
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 )
@@ -188,7 +190,8 @@ func (f *DefaultFuture) Fail(err error) {
 func (f *DefaultFuture) callListener() {
 	f.once.Do(func() {
 		for _, listener := range f.listeners {
-			if listener == nil {
+			vi := reflect.ValueOf(listener)
+			if vi.Kind() == reflect.Ptr && vi.IsNil() {
 				println("DefaultFuture callListener got nil listener")
 				continue
 			}
@@ -213,6 +216,13 @@ type _FutureListener struct {
 }
 
 func (l *_FutureListener) OperationCompleted(f Future) {
+	defer func() {
+		if v := recover(); v != nil {
+			println(v)
+			println(string(debug.Stack()))
+		}
+	}()
+
 	if l.f == nil {
 		println("nil f in future listener")
 		l.Future.(CompletableFuture).Fail(fmt.Errorf("nil f in future listener"))
