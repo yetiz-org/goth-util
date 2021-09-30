@@ -139,9 +139,15 @@ func (f *DefaultFuture) Ctx() context.Context {
 }
 
 func (f *DefaultFuture) AddListener(listener FutureListener) Future {
+	if listener == nil {
+		println("DefaultFuture add nil listener")
+		return f
+	}
+
+	ll := listener
 	f.opL.Lock()
 	defer f.opL.Unlock()
-	f.listeners = append(f.listeners, listener)
+	f.listeners = append(f.listeners, ll)
 	return f
 }
 
@@ -182,6 +188,11 @@ func (f *DefaultFuture) Fail(err error) {
 func (f *DefaultFuture) callListener() {
 	f.once.Do(func() {
 		for _, listener := range f.listeners {
+			if listener == nil {
+				println("DefaultFuture callListener got nil listener")
+				continue
+			}
+
 			listener.OperationCompleted(f)
 		}
 	})
@@ -226,9 +237,15 @@ func (l *_FutureListener) OperationCompleted(f Future) {
 }
 
 func (l *_FutureListener) AddListener(listener FutureListener) Future {
+	if listener == nil {
+		println("_FutureListener add nil listener")
+		return l
+	}
+
+	ll := listener
 	l.Future.(*DefaultFuture).opL.Lock()
 	defer l.Future.(*DefaultFuture).opL.Unlock()
-	l.Future.(*DefaultFuture).listeners = append(l.Future.(*DefaultFuture).listeners, listener)
+	l.Future.(*DefaultFuture).listeners = append(l.Future.(*DefaultFuture).listeners, ll)
 	return l
 }
 
