@@ -107,7 +107,8 @@ func TestFuture(t *testing.T) {
 	f = NewFuture(ctx)
 	f.AddListener(NewFutureListener(func(f Future) {
 		assert.EqualValues(t, true, f.IsDone())
-		assert.EqualValues(t, true, f.IsCancelled())
+		assert.EqualValues(t, false, f.IsCancelled())
+		assert.EqualValues(t, true, f.IsError())
 		assert.EqualValues(t, true, f.Error() != nil)
 	}))
 

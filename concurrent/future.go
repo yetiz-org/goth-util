@@ -87,14 +87,14 @@ type DefaultFuture struct {
 	cancel    context.CancelFunc
 	opL       sync.Mutex
 	listeners []FutureListener
-	once      sync.Once
 }
 
 func (f *DefaultFuture) _waitCancelJudge() {
 	<-f.ctx.Done()
-	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateCancel) {
-		f.err = f.ctx.Err()
-		f.callListener()
+	if err := f.ctx.Err(); err != nil {
+		f.Fail(err)
+	} else {
+		f.Cancel()
 	}
 }
 
@@ -188,17 +188,15 @@ func (f *DefaultFuture) Fail(err error) {
 }
 
 func (f *DefaultFuture) callListener() {
-	f.once.Do(func() {
-		for _, listener := range f.listeners {
-			vi := reflect.ValueOf(listener)
-			if vi.Kind() == reflect.Ptr && vi.IsNil() {
-				println("DefaultFuture callListener got nil listener")
-				continue
-			}
-
-			listener.OperationCompleted(f)
+	for _, listener := range f.listeners {
+		vi := reflect.ValueOf(listener)
+		if vi.Kind() == reflect.Ptr && vi.IsNil() {
+			println("DefaultFuture callListener got nil listener")
+			continue
 		}
-	})
+
+		listener.OperationCompleted(f)
+	}
 }
 
 func (f *DefaultFuture) Payload() interface{} {
