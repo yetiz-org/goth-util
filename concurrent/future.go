@@ -3,7 +3,6 @@ package concurrent
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -48,7 +47,10 @@ func NewCarrierFuture(obj interface{}) Future {
 }
 
 func NewFuture(ctx context.Context) Future {
-	var f = &DefaultFuture{}
+	var f = &DefaultFuture{
+		listeners: []FutureListener{},
+	}
+
 	if ctx == nil {
 		f.ctx, f.cancel = context.WithCancel(context.Background())
 	} else {
@@ -142,14 +144,12 @@ func (f *DefaultFuture) Ctx() context.Context {
 
 func (f *DefaultFuture) AddListener(listener FutureListener) Future {
 	if listener == nil {
-		println("DefaultFuture add nil listener")
 		return f
 	}
 
-	ll := listener
 	f.opL.Lock()
 	defer f.opL.Unlock()
-	f.listeners = append(f.listeners, ll)
+	f.listeners = append(f.listeners, listener)
 	return f
 }
 
@@ -188,10 +188,12 @@ func (f *DefaultFuture) Fail(err error) {
 }
 
 func (f *DefaultFuture) callListener() {
+	if f.listeners == nil {
+		f.listeners = []FutureListener{}
+	}
+
 	for _, listener := range f.listeners {
-		vi := reflect.ValueOf(listener)
-		if vi.Kind() == reflect.Ptr && vi.IsNil() {
-			println("DefaultFuture callListener got nil listener")
+		if listener == nil {
 			continue
 		}
 
@@ -222,7 +224,6 @@ func (l *_FutureListener) OperationCompleted(f Future) {
 	}()
 
 	if l.f == nil {
-		println("nil f in future listener")
 		l.Future.(CompletableFuture).Fail(fmt.Errorf("nil f in future listener"))
 		return
 	}
@@ -246,7 +247,6 @@ func (l *_FutureListener) OperationCompleted(f Future) {
 
 func (l *_FutureListener) AddListener(listener FutureListener) Future {
 	if listener == nil {
-		println("_FutureListener add nil listener")
 		return l
 	}
 
