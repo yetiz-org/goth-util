@@ -49,3 +49,19 @@ func IsPublicIP(ip net.IP) bool {
 
 	return true
 }
+
+func IsCIDRContain(cidr string, ip net.IP) bool {
+	if ipNet := ParseIPNet(cidr); ipNet != nil {
+		return ipNet.Contains(ip)
+	}
+
+	return false
+}
+
+func IsIPNetContain(ipNet *net.IPNet, ip net.IP) bool {
+	if ipNet != nil {
+		return ipNet.Contains(ip)
+	}
+
+	return false
+}
