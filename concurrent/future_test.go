@@ -146,4 +146,20 @@ func TestFuture(t *testing.T) {
 
 	<-f.Done()
 	assert.True(t, st.Add(time.Second/2).Before(time.Now()))
+
+	f = NewFuture(nil)
+	startTime := time.Now()
+	f.AwaitTimeout(time.Millisecond)
+	assert.True(t, time.Now().Sub(startTime) > time.Millisecond)
+	assert.False(t, f.IsDone())
+	startTime = time.Now()
+	go func() {
+		time.After(time.Microsecond)
+		f.Completable().Complete(nil)
+	}()
+
+	f.GetTimeout(time.Millisecond)
+	assert.False(t, time.Now().Sub(startTime) > time.Millisecond)
+	assert.True(t, f.IsDone())
+	assert.True(t, f.IsSuccess())
 }

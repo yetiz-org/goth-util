@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const (
@@ -17,8 +18,10 @@ const (
 
 type Future interface {
 	Get() interface{}
+	GetTimeout(timeout time.Duration) interface{}
 	Done() <-chan struct{}
 	Await() Future
+	AwaitTimeout(timeout time.Duration) Future
 	IsDone() bool
 	IsSuccess() bool
 	IsCancelled() bool
@@ -56,7 +59,7 @@ func NewFuture(ctx context.Context) Future {
 	} else {
 		f.ctx, f.cancel = context.WithCancel(ctx)
 		go func(f *DefaultFuture) {
-			f._waitCancelJudge()
+			f._waitCancelJudge(0)
 		}(f)
 	}
 
@@ -91,8 +94,33 @@ type DefaultFuture struct {
 	listeners []FutureListener
 }
 
-func (f *DefaultFuture) _waitCancelJudge() {
-	<-f.ctx.Done()
+func (f *DefaultFuture) _waitCancelJudge(timeout time.Duration) (done bool) {
+	return f._waitJudge(timeout, true)
+}
+
+func (f *DefaultFuture) _waitJudge(timeout time.Duration, withCancel bool) (done bool) {
+	if timeout == 0 {
+		<-f.ctx.Done()
+		if withCancel {
+			f._cancelJudge()
+		}
+
+		return true
+	} else {
+		select {
+		case <-f.ctx.Done():
+			if withCancel {
+				f._cancelJudge()
+			}
+
+			return true
+		case <-time.After(timeout):
+			return false
+		}
+	}
+}
+
+func (f *DefaultFuture) _cancelJudge() {
 	if err := f.ctx.Err(); err != nil {
 		f.Fail(err)
 	} else {
@@ -101,12 +129,19 @@ func (f *DefaultFuture) _waitCancelJudge() {
 }
 
 func (f *DefaultFuture) Get() interface{} {
+	return f.GetTimeout(0)
+}
+
+func (f *DefaultFuture) GetTimeout(timeout time.Duration) interface{} {
 	if f.IsDone() {
 		return f.obj
 	}
 
-	f._waitCancelJudge()
-	return f.obj
+	if f._waitCancelJudge(timeout) {
+		return f.obj
+	}
+
+	return nil
 }
 
 func (f *DefaultFuture) Done() <-chan struct{} {
@@ -115,6 +150,11 @@ func (f *DefaultFuture) Done() <-chan struct{} {
 
 func (f *DefaultFuture) Await() Future {
 	f.Get()
+	return f
+}
+
+func (f *DefaultFuture) AwaitTimeout(timeout time.Duration) Future {
+	f._waitJudge(timeout, false)
 	return f
 }
 
