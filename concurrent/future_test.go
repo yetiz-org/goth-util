@@ -162,4 +162,7 @@ func TestFuture(t *testing.T) {
 	assert.False(t, time.Now().Sub(startTime) > time.Millisecond)
 	assert.True(t, f.IsDone())
 	assert.True(t, f.IsSuccess())
+
+	assert.True(t, f.Immutable().IsDone())
+	assert.True(t, f.Immutable().IsSuccess())
 }

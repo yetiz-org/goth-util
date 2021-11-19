@@ -30,6 +30,22 @@ type Future interface {
 	Ctx() context.Context
 	AddListener(listener FutureListener) Future
 	Completable() CompletableFuture
+	Immutable() ImmutableFuture
+}
+
+type ImmutableFuture interface {
+	Get() interface{}
+	GetTimeout(timeout time.Duration) interface{}
+	Done() <-chan struct{}
+	Await() Future
+	AwaitTimeout(timeout time.Duration) Future
+	IsDone() bool
+	IsSuccess() bool
+	IsCancelled() bool
+	IsError() bool
+	Error() error
+	Ctx() context.Context
+	AddListener(listener FutureListener) Future
 }
 
 type CompletableFuture interface {
@@ -199,6 +215,10 @@ func (f *DefaultFuture) self() Future {
 
 func (f *DefaultFuture) Completable() CompletableFuture {
 	return f.self().(CompletableFuture)
+}
+
+func (f *DefaultFuture) Immutable() ImmutableFuture {
+	return f.self().(ImmutableFuture)
 }
 
 func (f *DefaultFuture) Complete(obj interface{}) {
