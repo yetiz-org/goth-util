@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -106,7 +105,6 @@ type DefaultFuture struct {
 	err       error
 	ctx       context.Context
 	cancel    context.CancelFunc
-	opL       sync.Mutex
 	listeners []FutureListener
 }
 
@@ -203,8 +201,6 @@ func (f *DefaultFuture) AddListener(listener FutureListener) Future {
 		return f
 	}
 
-	f.opL.Lock()
-	defer f.opL.Unlock()
 	f.listeners = append(f.listeners, listener)
 	return f
 }
@@ -311,8 +307,6 @@ func (l *_FutureListener) AddListener(listener FutureListener) Future {
 	}
 
 	ll := listener
-	l.Future.(*DefaultFuture).opL.Lock()
-	defer l.Future.(*DefaultFuture).opL.Unlock()
 	l.Future.(*DefaultFuture).listeners = append(l.Future.(*DefaultFuture).listeners, ll)
 	return l
 }
