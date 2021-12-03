@@ -9,7 +9,6 @@ type Mutex struct {
 	l    chan int
 	ul   chan int
 	once sync.Once
-	s    sync.Mutex
 }
 
 func (m *Mutex) check() {
