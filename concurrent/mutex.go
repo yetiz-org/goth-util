@@ -21,7 +21,7 @@ func (m *Mutex) check() {
 }
 
 // TryLockTimeout
-// try to get lock with timeout
+// try to get lock with timeout, if it can't get lock until timeout, it will return `false`
 // it will return `true` when get lock success or `false` on fail
 func (m *Mutex) TryLockTimeout(timeout time.Duration) bool {
 	m.check()
@@ -34,6 +34,9 @@ func (m *Mutex) TryLockTimeout(timeout time.Duration) bool {
 	}
 }
 
+// TryLock
+// try to lock Mutex if it is unlocked
+// it will return `true` when get lock success or `false` on fail
 func (m *Mutex) TryLock() bool {
 	m.check()
 	select {
@@ -45,6 +48,8 @@ func (m *Mutex) TryLock() bool {
 	}
 }
 
+// Lock
+// wait and get lock
 func (m *Mutex) Lock() {
 	m.check()
 	select {
@@ -56,6 +61,8 @@ func (m *Mutex) Lock() {
 	}
 }
 
+// Unlock
+// unlock mutex
 func (m *Mutex) Unlock() {
 	m.check()
 	select {
