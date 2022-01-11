@@ -1,9 +1,7 @@
 package concurrent
 
 import (
-	"context"
 	"fmt"
-	"runtime/debug"
 	"sync/atomic"
 	"time"
 )
@@ -15,130 +13,118 @@ const (
 	stateFail
 )
 
+type ChainFuture interface {
+	Future
+	Parent() ChainFuture
+}
+
 type Future interface {
+	Immutable
+	Completable() Completable
+	Immutable() Immutable
+	Chainable() ChainFuture
+	Then(fn func(parent Future) interface{}) (future Future)
+	ThenAsync(fn func(parent Future) interface{}) (future Future)
+}
+
+type Immutable interface {
 	Get() interface{}
 	GetTimeout(timeout time.Duration) interface{}
+	GetNow() interface{}
 	Done() <-chan struct{}
 	Await() Future
 	AwaitTimeout(timeout time.Duration) Future
 	IsDone() bool
 	IsSuccess() bool
 	IsCancelled() bool
-	IsError() bool
+	IsFail() bool
 	Error() error
-	Ctx() context.Context
-	AddListener(listener FutureListener) Future
-	Completable() CompletableFuture
-	Immutable() ImmutableFuture
-}
-
-type ImmutableFuture interface {
-	Get() interface{}
-	GetTimeout(timeout time.Duration) interface{}
-	Done() <-chan struct{}
-	Await() Future
-	AwaitTimeout(timeout time.Duration) Future
-	IsDone() bool
-	IsSuccess() bool
-	IsCancelled() bool
-	IsError() bool
-	Error() error
-	Ctx() context.Context
 	AddListener(listener FutureListener) Future
 }
 
-type CompletableFuture interface {
-	Complete(obj interface{})
-	Cancel()
-	Fail(err error)
-	callListener()
+type Completable interface {
+	Complete(obj interface{}) bool
+	Cancel() bool
+	Fail(err error) bool
 }
 
-type CarrierFuture interface {
-	Payload() interface{}
+func NewFuture() Future {
+	return newDefaultFuture()
 }
 
-func NewCarrierFuture(obj interface{}) Future {
-	f := NewFuture(nil)
-	f.(*DefaultFuture).obj = obj
-	return f
-}
-
-func NewFuture(ctx context.Context) Future {
-	var f = &DefaultFuture{
-		listeners: []FutureListener{},
-	}
-
-	if ctx == nil {
-		f.ctx, f.cancel = context.WithCancel(context.Background())
-	} else {
-		f.ctx, f.cancel = context.WithCancel(ctx)
-		go func(f *DefaultFuture) {
-			f._waitCancelJudge(0)
-		}(f)
-	}
-
-	return f
-}
-
-func NewSucceededFuture(obj interface{}) Future {
-	f := NewFuture(nil)
-	f.(CompletableFuture).Complete(obj)
+func NewCompletedFuture(obj interface{}) Future {
+	f := NewFuture()
+	f.Completable().Complete(obj)
 	return f
 }
 
 func NewCancelledFuture() Future {
-	f := NewFuture(nil)
-	f.(CompletableFuture).Cancel()
+	f := NewFuture()
+	f.Completable().Cancel()
 	return f
 }
 
 func NewFailedFuture(err error) Future {
-	f := NewFuture(nil)
-	f.(CompletableFuture).Fail(err)
+	f := NewFuture()
+	f.Completable().Fail(err)
+	return f
+}
+
+func NewChainFuture(future ChainFuture) ChainFuture {
+	f := newDefaultFuture()
+	f.parent = future
 	return f
 }
 
 type DefaultFuture struct {
+	m         Mutex
 	obj       interface{}
 	state     int32
 	err       error
-	ctx       context.Context
-	cancel    context.CancelFunc
 	listeners []FutureListener
+	parent    ChainFuture
 }
 
-func (f *DefaultFuture) _waitCancelJudge(timeout time.Duration) (done bool) {
-	return f._waitJudge(timeout, true)
+func newDefaultFuture() *DefaultFuture {
+	var f = &DefaultFuture{
+		listeners: []FutureListener{},
+	}
+
+	f.m.Lock()
+	return f
 }
 
-func (f *DefaultFuture) _waitJudge(timeout time.Duration, withCancel bool) (done bool) {
+func (f *DefaultFuture) Parent() ChainFuture {
+	return f.parent
+}
+
+func (f *DefaultFuture) self() Future {
+	return f
+}
+
+func (f *DefaultFuture) Completable() Completable {
+	return f.self().(Completable)
+}
+
+func (f *DefaultFuture) Immutable() Immutable {
+	return f.self().(Immutable)
+}
+
+func (f *DefaultFuture) Chainable() ChainFuture {
+	return f.self().(ChainFuture)
+}
+
+func (f *DefaultFuture) _waitJudge(timeout time.Duration) (done bool) {
 	if timeout == 0 {
-		<-f.ctx.Done()
-		if withCancel {
-			f._cancelJudge()
-		}
-
+		<-f.m.Unlocked()
 		return true
 	} else {
 		select {
-		case <-f.ctx.Done():
-			if withCancel {
-				f._cancelJudge()
-			}
-
+		case <-f.m.Unlocked():
 			return true
 		case <-time.After(timeout):
 			return false
 		}
-	}
-}
-
-func (f *DefaultFuture) _cancelJudge() {
-	if err := f.ctx.Err(); err != nil {
-		f.Fail(err)
-	} else {
-		f.Cancel()
 	}
 }
 
@@ -151,24 +137,28 @@ func (f *DefaultFuture) GetTimeout(timeout time.Duration) interface{} {
 		return f.obj
 	}
 
-	if f._waitCancelJudge(timeout) {
+	if f._waitJudge(timeout) {
 		return f.obj
 	}
 
 	return nil
 }
 
+func (f *DefaultFuture) GetNow() interface{} {
+	return f.obj
+}
+
 func (f *DefaultFuture) Done() <-chan struct{} {
-	return f.ctx.Done()
+	return f.m.Unlocked()
 }
 
 func (f *DefaultFuture) Await() Future {
-	f.Get()
+	<-f.m.Unlocked()
 	return f
 }
 
 func (f *DefaultFuture) AwaitTimeout(timeout time.Duration) Future {
-	f._waitJudge(timeout, false)
+	f.GetTimeout(timeout)
 	return f
 }
 
@@ -184,7 +174,7 @@ func (f *DefaultFuture) IsCancelled() bool {
 	return atomic.LoadInt32(&f.state) == stateCancel
 }
 
-func (f *DefaultFuture) IsError() bool {
+func (f *DefaultFuture) IsFail() bool {
 	return atomic.LoadInt32(&f.state) == stateFail
 }
 
@@ -192,12 +182,14 @@ func (f *DefaultFuture) Error() error {
 	return f.err
 }
 
-func (f *DefaultFuture) Ctx() context.Context {
-	return f.ctx
-}
-
 func (f *DefaultFuture) AddListener(listener FutureListener) Future {
 	if listener == nil {
+		return f
+	}
+
+	if f.IsDone() {
+		<-f.m.Unlocked()
+		listener.OperationCompleted(f)
 		return f
 	}
 
@@ -205,47 +197,44 @@ func (f *DefaultFuture) AddListener(listener FutureListener) Future {
 	return f
 }
 
-func (f *DefaultFuture) self() Future {
-	return f
-}
-
-func (f *DefaultFuture) Completable() CompletableFuture {
-	return f.self().(CompletableFuture)
-}
-
-func (f *DefaultFuture) Immutable() ImmutableFuture {
-	return f.self().(ImmutableFuture)
-}
-
-func (f *DefaultFuture) Complete(obj interface{}) {
+func (f *DefaultFuture) Complete(obj interface{}) bool {
 	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateSuccess) {
 		if obj != nil {
 			f.obj = obj
 		}
 
+		f.m.Unlock()
 		f.callListener()
-		f.cancel()
+		return true
 	}
+
+	return false
 }
 
-func (f *DefaultFuture) Cancel() {
+func (f *DefaultFuture) Cancel() bool {
 	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateCancel) {
+		f.m.Unlock()
 		f.callListener()
-		f.cancel()
+		return true
 	}
+
+	return false
 }
 
-func (f *DefaultFuture) Fail(err error) {
+func (f *DefaultFuture) Fail(err error) bool {
 	if atomic.CompareAndSwapInt32(&f.state, stateWait, stateFail) {
 		f.err = err
+		f.m.Unlock()
 		f.callListener()
-		f.cancel()
+		return true
 	}
+
+	return false
 }
 
 func (f *DefaultFuture) callListener() {
 	if f.listeners == nil {
-		f.listeners = []FutureListener{}
+		return
 	}
 
 	for _, listener := range f.listeners {
@@ -257,64 +246,130 @@ func (f *DefaultFuture) callListener() {
 	}
 }
 
-func (f *DefaultFuture) Payload() interface{} {
-	return f.obj
+func (f *DefaultFuture) Then(fn func(parent Future) interface{}) (future Future) {
+	cf := f
+	future = NewChainFuture(cf)
+	lfn := fn
+	f.AddListener(NewFutureListener(func(f Future) {
+		if cf.IsCancelled() {
+			future.Completable().Cancel()
+			return
+		}
+
+		if future.IsDone() {
+			return
+		}
+
+		var rtn interface{}
+		defer func() {
+			if e := recover(); e != nil {
+				if err, ok := e.(error); ok {
+					future.Completable().Fail(err)
+				} else {
+					future.Completable().Fail(fmt.Errorf("%v", e))
+				}
+			} else {
+				future.Completable().Complete(rtn)
+			}
+		}()
+
+		rtn = lfn(cf)
+	}))
+
+	return future
+}
+
+func (f *DefaultFuture) ThenAsync(fn func(parent Future) interface{}) (future Future) {
+	cf := f
+	future = NewChainFuture(cf)
+	lfn := fn
+	f.AddListener(NewFutureListener(func(f Future) {
+		if cf.IsCancelled() {
+			future.Completable().Cancel()
+			return
+		}
+
+		if future.IsDone() {
+			return
+		}
+
+		go func(cf Future, future Future, lfn func(parent Future) interface{}) {
+			var rtn interface{}
+			defer func() {
+				if e := recover(); e != nil {
+					if err, ok := e.(error); ok {
+						future.Completable().Fail(err)
+					} else {
+						future.Completable().Fail(fmt.Errorf("%v", e))
+					}
+				} else {
+					future.Completable().Complete(rtn)
+				}
+			}()
+
+			rtn = lfn(cf)
+		}(cf, future, lfn)
+	}))
+
+	return future
 }
 
 type FutureListener interface {
-	Future
 	OperationCompleted(f Future)
 }
 
 type _FutureListener struct {
-	Future
 	f func(f Future)
 }
 
 func (l *_FutureListener) OperationCompleted(f Future) {
-	defer func() {
-		if v := recover(); v != nil {
-			println(v)
-			println(string(debug.Stack()))
-		}
-	}()
-
-	if l.f == nil {
-		l.Future.(CompletableFuture).Fail(fmt.Errorf("nil f in future listener"))
-		return
-	}
-
-	func(f Future) {
-		defer func() {
-			if v := recover(); v != nil {
-				switch cast := v.(type) {
-				case error:
-					l.Future.(CompletableFuture).Fail(cast)
-				default:
-					l.Future.(CompletableFuture).Fail(fmt.Errorf("%v", cast))
-				}
-			}
-		}()
-
-		l.f(f)
-		l.Future.(CompletableFuture).Complete(f.Get())
-	}(f)
-}
-
-func (l *_FutureListener) AddListener(listener FutureListener) Future {
-	if listener == nil {
-		return l
-	}
-
-	ll := listener
-	l.Future.(*DefaultFuture).listeners = append(l.Future.(*DefaultFuture).listeners, ll)
-	return l
+	l.f(f)
 }
 
 func NewFutureListener(f func(f Future)) FutureListener {
 	lf := f
 	return &_FutureListener{
-		Future: NewFuture(nil),
-		f:      lf,
+		f: lf,
 	}
+}
+
+func Do(f func() interface{}) (future Future) {
+	future = NewFuture()
+	var rtn interface{}
+	defer func() {
+		if e := recover(); e != nil {
+			if err, ok := e.(error); ok {
+				future.Completable().Fail(err)
+			} else {
+				future.Completable().Fail(fmt.Errorf("%v", e))
+			}
+		} else {
+			future.Completable().Complete(rtn)
+		}
+	}()
+
+	rtn = f()
+	return future
+}
+
+func DoAsync(f func() interface{}) (future Future) {
+	future = NewFuture()
+	go func() {
+		var rtn interface{}
+		defer func() {
+			if e := recover(); e != nil {
+				if err, ok := e.(error); ok {
+					future.Completable().Fail(err)
+				} else {
+					future.Completable().Fail(fmt.Errorf("%v", e))
+				}
+			} else {
+				future.Completable().Complete(rtn)
+			}
+		}()
+
+		rtn = f()
+	}()
+
+	return future
 }
