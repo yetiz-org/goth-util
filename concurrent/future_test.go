@@ -195,4 +195,11 @@ func TestFuture(t *testing.T) {
 	assert.True(t, f.Then(func(parent Future) interface{} {
 		return nil
 	}).Await().IsCancelled())
+
+	f = NewFuture()
+	f.(Settable).Set("1")
+	assert.True(t, !f.IsDone())
+	assert.Equal(t, "1", f.GetNow())
+	assert.True(t, f.Completable().Complete("2"))
+	assert.Equal(t, "2", f.Get())
 }

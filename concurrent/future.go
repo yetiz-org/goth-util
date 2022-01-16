@@ -48,6 +48,10 @@ type Completable interface {
 	Fail(err error) bool
 }
 
+type Settable interface {
+	Set(obj interface{})
+}
+
 func NewFuture() Future {
 	return newDefaultFuture()
 }
@@ -230,6 +234,10 @@ func (f *DefaultFuture) Fail(err error) bool {
 	}
 
 	return false
+}
+
+func (f *DefaultFuture) Set(obj interface{}) {
+	f.obj = obj
 }
 
 func (f *DefaultFuture) callListener() {
