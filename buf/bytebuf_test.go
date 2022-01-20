@@ -45,6 +45,32 @@ func TestDefaultByteBuf_WriteUInt64(t *testing.T) {
 	}
 }
 
+func TestDefaultByteBuf_WriteFloat32(t *testing.T) {
+	buf := EmptyByteBuf()
+	buf.WriteFloat32(math.MaxFloat32)
+	if math.MaxFloat32 != buf.ReadFloat32() {
+		t.Fail()
+	}
+
+	buf.WriteFloat32LE(math.MaxFloat32)
+	if math.MaxFloat32 != buf.ReadFloat32LE() {
+		t.Fail()
+	}
+}
+
+func TestDefaultByteBuf_WriteFloat64(t *testing.T) {
+	buf := EmptyByteBuf()
+	buf.WriteFloat64(math.MaxFloat64)
+	if math.MaxFloat64 != buf.ReadFloat64() {
+		t.Fail()
+	}
+
+	buf.WriteFloat64LE(math.MaxFloat64)
+	if math.MaxFloat64 != buf.ReadFloat64LE() {
+		t.Fail()
+	}
+}
+
 func TestDefaultByteBuf_Reset(t *testing.T) {
 	buf := EmptyByteBuf()
 	buf.WriteUInt64(math.MaxUint64)
