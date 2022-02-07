@@ -2,6 +2,7 @@ package concurrent
 
 import (
 	"fmt"
+	"reflect"
 	"sync/atomic"
 	"time"
 )
@@ -90,10 +91,7 @@ type DefaultFuture struct {
 }
 
 func newDefaultFuture() *DefaultFuture {
-	var f = &DefaultFuture{
-		listeners: []FutureListener{},
-	}
-
+	var f = &DefaultFuture{}
 	f.m.Lock()
 	return f
 }
@@ -250,6 +248,10 @@ func (f *DefaultFuture) callListener() {
 			continue
 		}
 
+		if ref := reflect.ValueOf(listener); ref.Kind() == reflect.Ptr && ref.IsNil() {
+			continue
+		}
+
 		listener.OperationCompleted(f)
 	}
 }
@@ -335,9 +337,12 @@ func (l *_FutureListener) OperationCompleted(f Future) {
 }
 
 func NewFutureListener(f func(f Future)) FutureListener {
-	lf := f
+	if f == nil {
+		return nil
+	}
+
 	return &_FutureListener{
-		f: lf,
+		f: f,
 	}
 }
 
