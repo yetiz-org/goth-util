@@ -1,6 +1,7 @@
 package hash
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	rand2 "crypto/rand"
@@ -10,7 +11,6 @@ import (
 	"math/rand"
 
 	"github.com/kklab-com/goth-base62"
-	buf "github.com/kklab-com/goth-bytebuf"
 )
 
 var TimeHashBase = []byte{75, 79, 78, 83, 73, 84, 69, 89}
@@ -94,7 +94,7 @@ func CryptoTimeHash(data []byte, timestamp int64, key []byte) string {
 			c ^= b
 		}
 
-		bb := buf.NewByteBuf([]byte{c})
+		bb := bytes.NewBuffer([]byte{c})
 		if dr := (16 - ((len(data) + 2) % 16)) % 16; dr > 0 {
 			bb.WriteByte(byte(dr))
 			bb.Write(data)

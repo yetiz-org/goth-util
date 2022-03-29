@@ -6,7 +6,6 @@ require (
 	github.com/biter777/countries v1.3.1
 	github.com/google/uuid v1.1.1
 	github.com/kklab-com/goth-base62 v1.0.0
-	github.com/kklab-com/goth-bytebuf v1.0.0
 	github.com/stretchr/testify v1.7.0
 )
 
