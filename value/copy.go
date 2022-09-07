@@ -2,6 +2,17 @@ package value
 
 import "reflect"
 
+func Cast[T any](in any) (t T) {
+	defer func() {
+		if e := recover(); e != nil {
+			return
+		}
+	}()
+
+	t = in.(T)
+	return
+}
+
 func Copy(from interface{}, to interface{}) {
 	toElem := reflect.ValueOf(to)
 	fromElem := reflect.ValueOf(from)
