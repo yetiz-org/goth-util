@@ -1,8 +1,15 @@
 package xtype
 
-import "strings"
+import (
+	"strings"
+	"unsafe"
+)
 
 type String string
+
+func (s String) Bytes() []byte {
+	return *(*[]byte)(unsafe.Pointer(&s))
+}
 
 func (s String) String() string {
 	return string(s)
