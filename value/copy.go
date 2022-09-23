@@ -3,13 +3,10 @@ package value
 import "reflect"
 
 func Cast[T any](in any) (t T) {
-	defer func() {
-		if e := recover(); e != nil {
-			return
-		}
-	}()
+	if v, ok := in.(T); ok {
+		t = v
+	}
 
-	t = in.(T)
 	return
 }
 
