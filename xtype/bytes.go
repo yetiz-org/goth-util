@@ -3,7 +3,7 @@ package xtype
 import (
 	"unsafe"
 
-	"github.com/kklab-com/goth-kkutil/hex"
+	"github.com/yetiz-org/goth-kkutil/hex"
 )
 
 type Bytes []byte

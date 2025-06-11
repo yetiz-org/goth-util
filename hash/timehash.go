@@ -10,7 +10,7 @@ import (
 	"io"
 	"math/rand"
 
-	"github.com/kklab-com/goth-base62"
+	"github.com/yetiz-org/goth-base62"
 )
 
 var TimeHashBase = []byte{75, 79, 78, 83, 73, 84, 69, 89}
