@@ -1,4 +1,4 @@
-module github.com/yetiz-org/goth-kkutil
+module github.com/yetiz-org/goth-util
 
 go 1.23
 

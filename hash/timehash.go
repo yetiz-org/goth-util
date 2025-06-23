@@ -15,6 +15,7 @@ import (
 
 var TimeHashBase = []byte{75, 79, 78, 83, 73, 84, 69, 89}
 var CryptoTimeHashPadding = byte(0x59)
+var CryptoTimeHashXBit = byte(0x53)
 
 /*
 encode data with timestamp
@@ -38,7 +39,7 @@ func TimeHash(data []byte, timestamp int64) string {
 			if i < dl {
 				bs[i] = data[i]
 			} else {
-				bs[i] = byte(rand.Int31n(255))
+				bs[i] = byte(rand.Int31n(256))
 			}
 		}
 
@@ -53,10 +54,10 @@ func TimeHash(data []byte, timestamp int64) string {
 
 	rl := dpl + 12
 	r := make([]byte, rl)
-	r[0] = 0x59
+	r[0] = CryptoTimeHashPadding
 	r[1] = v
 	r[2] = pad
-	r[rl-1] = 0x53
+	r[rl-1] = CryptoTimeHashXBit
 	for i := 0; i < 8; i++ {
 		for j := 0; j < align; j++ {
 			r[3+i*(align+1)+j] = data[i*align+j] ^ bs[i]
@@ -69,7 +70,7 @@ func TimeHash(data []byte, timestamp int64) string {
 		r[rl-1] ^= r[i]
 	}
 
-	r[0] = byte((int(r[0]) + int(r[rl-1])) % 255)
+	r[0] = byte((int(r[0]) + int(r[rl-1])) % 256)
 	r[1] ^= r[0]
 	r[2] ^= r[0]
 	return base62.ShiftEncoding.EncodeToString(r)
@@ -125,7 +126,7 @@ func CryptoTimeHash(data []byte, timestamp int64, key []byte) string {
 			if i < dl {
 				bs[i] = data[i]
 			} else {
-				bs[i] = byte(rand.Int31n(255))
+				bs[i] = byte(rand.Int31n(256))
 			}
 		}
 
@@ -134,10 +135,10 @@ func CryptoTimeHash(data []byte, timestamp int64, key []byte) string {
 
 	rl := dpl + 12
 	r := make([]byte, rl)
-	r[0] = 0x59
+	r[0] = CryptoTimeHashPadding
 	r[1] = v
 	r[2] = pad
-	r[rl-1] = 0x53
+	r[rl-1] = CryptoTimeHashXBit
 	for i := 0; i < 8; i++ {
 		for j := 0; j < align; j++ {
 			r[3+i*(align+1)+j] = data[i*align+j] ^ tbs[i]
@@ -150,7 +151,7 @@ func CryptoTimeHash(data []byte, timestamp int64, key []byte) string {
 		r[rl-1] ^= r[i]
 	}
 
-	r[0] = byte((int(r[0]) + int(r[rl-1])) % 255)
+	r[0] = byte((int(r[0]) + int(r[rl-1])) % 256)
 	r[1] ^= r[0]
 	r[2] ^= r[0]
 	return base62.ShiftEncoding.EncodeToString(r)
@@ -252,7 +253,7 @@ func ValidateTimeHash(encoded string) bool {
 		return false
 	}
 
-	var c byte = 0x53
+	var c byte = CryptoTimeHashXBit
 	for i := 1; i < dl-1; i++ {
 		c ^= d[i]
 	}
@@ -261,7 +262,7 @@ func ValidateTimeHash(encoded string) bool {
 		return false
 	}
 
-	if byte((int(c)+0x59)%255) != d[0] {
+	if byte((int(c)+int(CryptoTimeHashPadding))%256) != d[0] {
 		return false
 	}
 
