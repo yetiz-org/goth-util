@@ -8,7 +8,7 @@ require (
 	github.com/biter777/countries v1.7.5
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.10.0
-	github.com/yetiz-org/goth-base62 v0.0.0-20250611115419-c6835bcfab05
+	github.com/yetiz-org/goth-base62 v1.1.0
 )
 
 require (

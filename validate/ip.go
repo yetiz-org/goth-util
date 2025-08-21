@@ -1,7 +1,12 @@
+// Package validate provides utilities for validating various data types including
+// IP addresses, phone numbers, email addresses, and other common formats.
 package validate
 
 import "net"
 
+// NonPublicIPNet contains a list of IP network ranges that are considered non-public.
+// This includes private networks, loopback addresses, multicast ranges, and other
+// special-use IP address ranges as defined by various RFCs.
 var NonPublicIPNet = []net.IPNet{
 	*ParseIPNet("10.0.0.0/8"),
 	*ParseIPNet("172.16.0.0/12"),

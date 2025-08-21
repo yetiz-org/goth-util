@@ -1,3 +1,6 @@
+// Package hash provides time-based hashing utilities with optional encryption support.
+// It implements a custom encoding scheme that embeds timestamp information along with data,
+// allowing for data integrity verification and timestamp extraction.
 package hash
 
 import (
@@ -13,15 +16,36 @@ import (
 	"github.com/yetiz-org/goth-base62"
 )
 
+// TimeHashBase is the base key used for XOR operations in the time hash algorithm.
+// This constant provides a fixed seed for consistent encoding/decoding operations.
 var TimeHashBase = []byte{75, 79, 78, 83, 73, 84, 69, 89}
+
+// CryptoTimeHashPadding is the padding byte used in encrypted time hash operations.
+// This value is used for both padding data and as part of the integrity check.
 var CryptoTimeHashPadding = byte(0x59)
+
+// CryptoTimeHashXBit is the XOR bit used for checksum calculations in time hashes.
+// This value helps ensure data integrity during encoding and decoding operations.
 var CryptoTimeHashXBit = byte(0x53)
 
-/*
-encode data with timestamp
-`data` can't be nil or empty slice,
-`timestamp` can't less than or equal to 0
-*/
+// TimeHash encodes data with an embedded timestamp using a custom algorithm.
+// The function combines the data with the timestamp and applies XOR operations
+// with padding and checksum validation to create a secure, time-stamped hash.
+//
+// Parameters:
+//   - data: The byte slice to be encoded (cannot be nil or empty)
+//   - timestamp: Unix timestamp in seconds (must be greater than 0)
+//
+// Returns:
+//   - A base62-encoded string containing the hashed data with embedded timestamp
+//   - Empty string if input validation fails
+//
+// The encoding process:
+//  1. Validates input parameters
+//  2. Applies padding to align data to 8-byte boundaries
+//  3. XORs data segments with timestamp-derived keys
+//  4. Adds integrity checksums
+//  5. Encodes result using base62 encoding
 func TimeHash(data []byte, timestamp int64) string {
 	if data == nil || len(data) == 0 || timestamp <= 0 {
 		return ""
@@ -76,6 +100,29 @@ func TimeHash(data []byte, timestamp int64) string {
 	return base62.ShiftEncoding.EncodeToString(r)
 }
 
+// CryptoTimeHash encodes data with an embedded timestamp using AES encryption.
+// This function provides enhanced security by encrypting the data before applying
+// the time hash algorithm, making it suitable for sensitive information.
+//
+// Parameters:
+//   - data: The byte slice to be encoded and encrypted (cannot be nil or empty)
+//   - timestamp: Unix timestamp in seconds (must be greater than 0)
+//   - key: Encryption key (cannot be nil or empty, will be SHA256 hashed to 32-byte key)
+//
+// Returns:
+//   - A base62-encoded string containing the encrypted and hashed data with embedded timestamp
+//   - Empty string if input validation fails or encryption fails
+//
+// The encoding process:
+//  1. Validates all input parameters
+//  2. Encrypts the data using AES-256-CBC with the provided key
+//  3. Applies the TimeHash algorithm to the encrypted data
+//  4. Returns the base62-encoded result
+//
+// Security features:
+//   - AES-256-CBC encryption with random IV
+//   - SHA256 key derivation for consistent 32-byte keys
+//   - Integrity validation through checksums
 func CryptoTimeHash(data []byte, timestamp int64, key []byte) string {
 	if data == nil || len(data) == 0 || timestamp <= 0 || key == nil || len(key) == 0 {
 		return ""
@@ -157,21 +204,26 @@ func CryptoTimeHash(data []byte, timestamp int64, key []byte) string {
 	return base62.ShiftEncoding.EncodeToString(r)
 }
 
+// _Encrypt is an internal function that encrypts data using AES-256-CBC encryption.
+// The key is automatically hashed using SHA256 to ensure a consistent 32-byte key length.
+// A random IV is generated for each encryption operation to ensure security.
+// Optimized version with reduced memory allocations.
+//
+// Parameters:
+//   - key: The encryption key (will be SHA256 hashed)
+//   - data: The data to encrypt
+//
+// Returns:
+//   - Encrypted data with IV prepended, or nil if encryption fails
 func _Encrypt(key []byte, data []byte) []byte {
 	if data == nil {
 		return nil
 	}
 
-	key = func() []byte {
-		r := make([]byte, 32)
-		for i, k := 0, sha256.Sum256(key); i < 32; i++ {
-			r[i] = k[i]
-		}
-
-		return r
-	}()
-
-	block, _ := aes.NewCipher(key)
+	// Optimize key derivation - avoid extra allocation
+	keyHash := sha256.Sum256(key)
+	
+	block, _ := aes.NewCipher(keyHash[:])
 	rtn := make([]byte, aes.BlockSize+len(data))
 	iv := rtn[:aes.BlockSize]
 	if _, err := io.ReadFull(rand2.Reader, iv); err != nil {
@@ -183,21 +235,26 @@ func _Encrypt(key []byte, data []byte) []byte {
 	return rtn
 }
 
+// _Decrypt is an internal function that decrypts AES-256-CBC encrypted data.
+// The key is automatically hashed using SHA256 to ensure a consistent 32-byte key length.
+// The function expects the IV to be prepended to the encrypted data.
+// Optimized version with reduced memory allocations.
+//
+// Parameters:
+//   - key: The decryption key (will be SHA256 hashed)
+//   - encrypted: The encrypted data with IV prepended
+//
+// Returns:
+//   - Decrypted data, or nil if decryption fails or input is invalid
 func _Decrypt(key []byte, encrypted []byte) []byte {
 	if len(encrypted) < aes.BlockSize || len(encrypted)%aes.BlockSize != 0 {
 		return nil
 	}
 
-	key = func() []byte {
-		r := make([]byte, 32)
-		for i, k := 0, sha256.Sum256(key); i < 32; i++ {
-			r[i] = k[i]
-		}
-
-		return r
-	}()
-
-	block, _ := aes.NewCipher(key)
+	// Optimize key derivation - avoid extra allocation
+	keyHash := sha256.Sum256(key)
+	
+	block, _ := aes.NewCipher(keyHash[:])
 	iv := encrypted[:aes.BlockSize]
 	encrypted = encrypted[aes.BlockSize:]
 	mode := cipher.NewCBCDecrypter(block, iv)
